@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Web Tester</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header>
+        <p class="eyebrow">AI WEB TESTER</p>
+        <h1>Page scan</h1>
+        <p id="status" class="status" aria-live="polite">Ready to inspect this page.</p>
+      </header>
+
+      <button id="scan-button" class="primary-button" type="button">Scan Current Page</button>
+
+      <section id="results" class="results" hidden aria-live="polite">
+        <div class="results-heading">
+          <h2>Findings</h2>
+          <span id="result-count"></span>
+        </div>
+        <div id="finding-list"></div>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "AI Web Tester",
+  "version": "0.1.0",
+  "description": "Capture page context and submit it to the AI web-testing API.",
+  "action": {
+    "default_title": "AI Web Tester",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1:8000/*", "http://localhost:8000/*"]
+}
