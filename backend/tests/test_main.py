@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from main import DOMPayload, app
+from config import Settings
 from middleware import RequestTimeoutMiddleware, scan_id_context
 
 
@@ -17,6 +18,10 @@ def test_health_check() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
     assert response.headers["X-Scan-ID"]
+
+
+def test_mock_llm_provider_is_the_safe_default() -> None:
+    assert Settings().llm_provider == "mock"
 
 
 def test_scan_preserves_valid_correlation_id() -> None:
