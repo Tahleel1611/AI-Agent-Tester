@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     api_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     llm_provider: Literal["openai", "anthropic", "oci", "mock"] = "mock"
     llm_api_key: str | None = Field(default=None, repr=False)
+    llm_model: str = "cohere.command-r-plus"
+    oci_auth_type: Literal["API_KEY", "INSTANCE_PRINCIPAL", "RESOURCE_PRINCIPAL"] = "API_KEY"
+    oci_profile: str | None = "DEFAULT"
+    oci_compartment_id: str | None = None
+    oci_service_endpoint: str | None = None
     allowed_cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost", "http://127.0.0.1"]
     )

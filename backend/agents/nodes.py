@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 from main import DOMPayload, Finding
+from .llm import get_llm
 
 
 def _snippet(payload: DOMPayload, fallback: str) -> str:
@@ -32,6 +34,64 @@ def _finding(
     )
 
 
+def _failure_finding(category: str, error: Exception) -> Finding:
+    signature = f"{category.lower().replace('/', '-')}:agent-failure"
+    return Finding(
+        id=signature,
+        category=category,
+        severity="low",
+        title=f"{category} agent unavailable",
+        description=f"The {category} specialist could not complete its analysis: {error}",
+        signature=signature,
+        dom_snippet="",
+    )
+
+
+async def _live_finding(
+    state: dict[str, Any], category: str, persona: str, signature_prefix: str
+) -> Finding | None:
+    """Ask a live provider for one schema-validated finding.
+
+    ``None`` deliberately represents mock mode; all live-provider and parsing
+    errors are handled by the caller so a specialist can emit a safe finding.
+    """
+    llm = get_llm()
+    if llm is None:
+        return None
+    payload: DOMPayload = state["payload"]
+    evidence = json.dumps(state["normalized_evidence"], sort_keys=True)
+    structured_llm = llm.with_structured_output(Finding)
+    finding = await structured_llm.ainvoke([
+        ("system", f"{persona} Return exactly one Finding. Use category '{category}'."),
+        ("human", f"Analyze this normalized web evidence:\n{evidence}"),
+    ])
+    if not isinstance(finding, Finding):
+        finding = Finding.model_validate(finding)
+    signature = finding.signature or f"{signature_prefix}:llm-finding"
+    return finding.model_copy(
+        update={
+            "category": category,
+            "signature": signature,
+            "id": signature,
+            "dom_snippet": finding.dom_snippet or _snippet(payload, finding.title),
+        }
+    )
+
+
+async def _maybe_live_finding(
+    state: dict[str, Any], category: str, persona: str, signature_prefix: str
+) -> dict[str, Any] | None:
+    """Return a live finding result, or ``None`` in mock mode."""
+    try:
+        finding = await _live_finding(state, category, persona, signature_prefix)
+    except Exception as error:
+        return {
+            "findings": [_failure_finding(category, error)],
+            "errors": {signature_prefix: str(error)},
+        }
+    return {"findings": [finding]} if finding is not None else None
+
+
 def normalizer_node(state: dict[str, Any]) -> dict[str, Any]:
     payload: DOMPayload = state["payload"]
     return {
@@ -47,6 +107,11 @@ def normalizer_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 async def security_agent_node(state: dict[str, Any]) -> dict[str, Any]:
+    live_result = await _maybe_live_finding(
+        state, "Security", "You are an expert OWASP security auditor.", "security"
+    )
+    if live_result is not None:
+        return live_result
     try:
         payload: DOMPayload = state["payload"]
         evidence = state["normalized_evidence"]
@@ -74,6 +139,11 @@ async def security_agent_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 async def ui_ux_agent_node(state: dict[str, Any]) -> dict[str, Any]:
+    live_result = await _maybe_live_finding(
+        state, "UI/UX", "You are a WCAG accessibility and DOM usability auditor.", "ui_ux"
+    )
+    if live_result is not None:
+        return live_result
     try:
         payload: DOMPayload = state["payload"]
         evidence = state["normalized_evidence"]
@@ -101,6 +171,11 @@ async def ui_ux_agent_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 async def logic_agent_node(state: dict[str, Any]) -> dict[str, Any]:
+    live_result = await _maybe_live_finding(
+        state, "Logic", "You are an expert web application workflow and validation auditor.", "logic"
+    )
+    if live_result is not None:
+        return live_result
     try:
         payload: DOMPayload = state["payload"]
         evidence = state["normalized_evidence"]
