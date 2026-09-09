@@ -56,9 +56,6 @@ async def run_swarm(payload: DOMPayload, scan_id: str) -> ScanResponse:
     })
     bugs: list[Finding] = []
     for finding in result.get("aggregated_findings", []):
-        historical = {"message": "Mock RAG match: a similar issue was reported in a prior scan."}
-        finding.recurring_issue = True
-        finding.historical_context = historical["message"]
         finding.remediation_prompt = generate_remediation_prompt(
             finding, finding.dom_snippet, finding.recurring_issue
         )

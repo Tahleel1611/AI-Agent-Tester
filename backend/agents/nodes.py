@@ -5,7 +5,13 @@ import json
 from typing import Any
 
 from main import DOMPayload, Finding
+from rag.store import BugMemory
 from .llm import get_llm
+
+
+# BugMemory initialization is best-effort; unavailable local storage simply
+# produces non-recurring findings rather than interrupting a scan.
+bug_memory = BugMemory()
 
 
 def _snippet(payload: DOMPayload, fallback: str) -> str:
@@ -205,4 +211,16 @@ def aggregator_node(state: dict[str, Any]) -> dict[str, Any]:
     unique: dict[str, Finding] = {}
     for finding in state.get("findings", []):
         unique.setdefault(finding.signature, finding)
-    return {"aggregated_findings": sorted(unique.values(), key=lambda finding: finding.signature)}
+    aggregated: list[Finding] = []
+    for finding in sorted(unique.values(), key=lambda finding: finding.signature):
+        is_recurring = bug_memory.check_recurrence(
+            finding.description, finding.dom_snippet
+        )
+        aggregated.append(finding.model_copy(update={
+            "recurring_issue": is_recurring,
+            "historical_context": (
+                "A semantically similar issue was found in historical bug memory."
+                if is_recurring else None
+            ),
+        }))
+    return {"aggregated_findings": aggregated}

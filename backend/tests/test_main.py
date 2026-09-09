@@ -89,7 +89,7 @@ def test_scan_rejects_invalid_url() -> None:
     assert response.status_code == 422
 
 
-def test_scan_results_are_deterministic() -> None:
+def test_scan_results_preserve_their_summary_across_recurrence_checks() -> None:
     payload = {
         "url": "https://example.com/form",
         "title": "Form",
@@ -99,7 +99,8 @@ def test_scan_results_are_deterministic() -> None:
     first = client.post("/scan", json=payload).json()
     second = client.post("/scan", json=payload).json()
 
-    assert first["bugs"] == second["bugs"]
+    # The second scan may be marked as recurring after the first scan has been
+    # stored in local Qdrant, so only stable scan-level output is compared.
     assert first["summary"] == second["summary"]
 
 

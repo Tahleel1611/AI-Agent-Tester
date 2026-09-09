@@ -36,4 +36,5 @@ desktop.ini
 # Logs and local data
 *.log
 *.sqlite3
+local_qdrant/
 

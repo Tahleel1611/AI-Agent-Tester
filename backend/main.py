@@ -141,8 +141,11 @@ app.add_middleware(
 
 def generate_remediation_prompt(bug_data: Finding, dom_snippet: str, is_recurring: bool) -> str:
     """Build a copy-paste-ready implementation request for a developer or coding AI."""
-    recurring_note = "This is a known recurring issue; include a regression test." if is_recurring else "No matching historical issue was found in the mock memory."
-    return f"""Role: Senior Web Developer\n\nTask: Resolve the {bug_data.severity}-severity {bug_data.category} issue: {bug_data.title}.\n\nContext: {bug_data.description}\n{recurring_note}\n\nFailing Code Snippet:\n{dom_snippet or '(No relevant DOM text was captured.)'}\n\nRequirements:\n- Preserve the existing user flow and public API behavior.\n- Implement the fix on both client and server where validation or security is involved.\n- Add an automated regression test covering the failing case.\n- Follow WCAG-accessible semantics for UI changes.\n- Explain the root cause and the verification performed in the pull request."""
+    recurring_note = (
+        "WARNING: This is a recurring regression. Include a regression test that prevents it from returning."
+        if is_recurring else "No matching historical issue was found."
+    )
+    return f"""{recurring_note}\n\nRole: Senior Web Developer\n\nTask: Resolve the {bug_data.severity}-severity {bug_data.category} issue: {bug_data.title}.\n\nContext: {bug_data.description}\n\nFailing Code Snippet:\n{dom_snippet or '(No relevant DOM text was captured.)'}\n\nRequirements:\n- Preserve the existing user flow and public API behavior.\n- Implement the fix on both client and server where validation or security is involved.\n- Add an automated regression test covering the failing case.\n- Follow WCAG-accessible semantics for UI changes.\n- Explain the root cause and the verification performed in the pull request."""
 
 
 @app.get("/health")
@@ -154,5 +157,9 @@ async def health_check() -> dict[str, str]:
 async def scan(payload: DOMPayload) -> ScanResponse:
     """Run the Phase 3 specialist graph and preserve the public scan contract."""
     from agents.graph import run_swarm
+    from agents.nodes import bug_memory
 
-    return await run_swarm(payload, scan_id_context.get())
+    response = await run_swarm(payload, scan_id_context.get())
+    for finding in response.bugs:
+        bug_memory.store_bug(finding)
+    return response
